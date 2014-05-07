@@ -12,7 +12,7 @@
 
 %% API
 -export([start_link/0]).
--export([add/2,next/1,set/2]).
+-export([add/2,next/1,rm/2,set/2]).
 -export([state/0]).
 
 %% gen_server callbacks
@@ -43,6 +43,9 @@ add(Class,Item) ->
 next(Class) ->
     gen_server:call(?SERVER,{next,Class}).
 
+rm(Class,Item) ->
+    gen_server:call(?SERVER,{rm,Class,Item}).
+
 set(Class,Items) ->
     gen_server:call(?SERVER,{set,Class,Items}).
 
@@ -68,6 +71,7 @@ init([]) ->
     lager:info("roundrobin_server starting"),
     case file:consult(?SEED_FILE) of
 	{ok, State} ->
+	    process_flag(trap_exit,true),
 	    {ok, State};
 	{error,Reason} ->
 	    lager:warning("could not load seed file ~p (reason: ~p)",[?SEED_FILE,Reason]),
@@ -114,6 +118,14 @@ handle_call({set,Class,Items},_From,State) ->
 	{Class,_OldItems} ->
 	    {reply, ok, lists:keyreplace(Class,1,State,{Class,Items})}
     end;
+handle_call({rm,Class,Item},_From,State) ->
+    lager:debug("removing ~p for class ~p",[Item,Class]),
+    case lists:keyfind(Class,1,State) of
+	false ->
+	    {reply, undefined, State};
+	{Class,Items} ->
+	    {reply, ok, lists:keyreplace(Class,1,State,{Class,lists:dropwhile(fun(I) -> I == Item end,Items)})}
+    end;
 handle_call(state,_From,State) ->
     {reply,State,State};
 handle_call(Request, From, State) ->
@@ -143,7 +155,8 @@ handle_cast(_Msg, State) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_info(_Info, State) ->
+handle_info(Info, State) ->
+    lager:warning("unexpected info -> ~p",[Info]),
     {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -157,8 +170,19 @@ handle_info(_Info, State) ->
 %% @spec terminate(Reason, State) -> void()
 %% @end
 %%--------------------------------------------------------------------
-terminate(_Reason, _State) ->
-    ok.
+terminate(Reason,State) ->
+    lager:info("roundrobin_server:terminate(~p)",[Reason]),
+    case file:open(?SEED_FILE,write) of
+	{error,Reason} ->
+	    lager:error("could not persist state data");
+	{ok,File} ->
+	    lists:foreach(
+	      fun(Class) ->
+		      lager:info("saving ~p",[Class]),
+		      io:format(File,"~p.~n",[Class])
+	      end,State),
+	    file:close(File)
+    end.
 
 %%--------------------------------------------------------------------
 %% @private
