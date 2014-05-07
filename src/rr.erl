@@ -1,12 +1,12 @@
 %%%-------------------------------------------------------------------
-%%% @author Brian H. Ward <brian@galago>
+%%% @author Brian H. Ward <glyphrider@gmail.com>
 %%% @copyright (C) 2014, Brian H. Ward
 %%% @doc
 %%%
 %%% @end
 %%% Created :  6 May 2014 by Brian H. Ward <brian@galago>
 %%%-------------------------------------------------------------------
--module(roundrobin_server).
+-module(rr).
 
 -behaviour(gen_server).
 

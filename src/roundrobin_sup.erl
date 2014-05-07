@@ -25,6 +25,6 @@ start_link() ->
 init([]) ->
     {ok, { {one_for_one, 5, 10},
 	   [
-	    ?CHILD(roundrobin_server,worker)
+	    ?CHILD(rr,worker)
 	   ]} }.
 
