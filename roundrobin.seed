@@ -1,0 +1,8 @@
+{odbc_connection_strings,[
+	"DSN=Primary,Uid=sa,Pwd=sa",
+	"DSN=Backup,Uid=sa,Pwd=sa"
+	]}.
+{http_servers,[
+	{"www.example.com",80},
+	{"ftp.example.com",21}
+	]}.
