@@ -1,0 +1,13 @@
+{application, roundrobin,
+ [
+  {description, "Round-robin selection"},
+  {vsn, "1.0.0"},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib,
+		  lager
+                 ]},
+  {mod, { roundrobin_app, []}},
+  {env, []}
+ ]}.
