@@ -10,6 +10,10 @@
 
 -behaviour(gen_server).
 
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+-endif.
+
 %% API
 -export([start_link/0]).
 -export([add/2,next/1,rm/2,set/2]).
@@ -26,6 +30,13 @@
 %%%===================================================================
 %%% API
 %%%===================================================================
+-type class() :: term().
+-type item() :: term().
+-spec(add(class(),item()) -> ok).
+-spec(next(class()) -> undefined | item()).
+-spec(rm(class(),item()) -> undefined | ok).
+-spec(set(class(),[item()]) -> ok).
+-spec(state() -> [{class(),[item()]}]).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -129,7 +140,7 @@ handle_call({rm,Class,Item},_From,State) ->
 handle_call(state,_From,State) ->
     {reply,State,State};
 handle_call(Request, From, State) ->
-    lager:warning("unexpected call ~p from ~p",[Request,From]),
+    lager:error("rr:handle_call() -> unexpected call: ~p (from ~p)",[Request,From]),
     {reply, undefined, State}.
 
 %%--------------------------------------------------------------------
@@ -142,7 +153,8 @@ handle_call(Request, From, State) ->
 %%                                  {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_cast(_Msg, State) ->
+handle_cast(Msg, State) ->
+    lager:error("rr:handle_cast() -> unexpected cast: ~p",[Msg]),
     {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -156,7 +168,7 @@ handle_cast(_Msg, State) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_info(Info, State) ->
-    lager:warning("unexpected info -> ~p",[Info]),
+    lager:error("rr:handle_info() -> unexpected info: ~p",[Info]),
     {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -171,14 +183,14 @@ handle_info(Info, State) ->
 %% @end
 %%--------------------------------------------------------------------
 terminate(Reason,State) ->
-    lager:info("roundrobin_server:terminate(~p)",[Reason]),
+    lager:info("rr:terminate(): reason -> ~p",[Reason]),
     case file:open(?SEED_FILE,write) of
 	{error,Reason} ->
-	    lager:error("could not persist state data");
+	    lager:error("rr:terminate(): could not persist state data to ~p",[?SEED_FILE]);
 	{ok,File} ->
 	    lists:foreach(
 	      fun(Class) ->
-		      lager:info("saving ~p",[Class]),
+		      lager:info("rr:terminate(): persisting class -> ~p",[Class]),
 		      io:format(File,"~p.~n",[Class])
 	      end,State),
 	    file:close(File)
@@ -192,9 +204,38 @@ terminate(Reason,State) ->
 %% @spec code_change(OldVsn, State, Extra) -> {ok, NewState}
 %% @end
 %%--------------------------------------------------------------------
-code_change(_OldVsn, State, _Extra) ->
+code_change(OldVsn, State, Extra) ->
+    lager:info("rr:code_change(): old version -> ~p, extra -> ~p",[OldVsn,Extra]),
     {ok, State}.
 
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+
+-ifdef(EUNIT).
+
+next_returns_undefined_for_empty_state_test() ->
+    {reply,undefined,[]} = rr:handle_call({next,any},test,[]).
+
+next_returns_first_in_list_and_rotates_list_test() ->
+    {reply,first,[{class,[second,first]}]} =
+	rr:handle_call({next,class},
+		test,
+		[{class,[first,second]}]).
+
+next_handles_single_item_in_list_test() ->
+    {reply,only,[{class,[only]}]} = rr:handle_call({next,class},test,[{class,[only]}]).
+
+next_returns_undefined_for_missing_class_test() ->
+    {reply,undefined,[{present,[value]}]} = rr:handle_call({next,missing},test,[{present,[value]}]).
+
+next_preserves_unaskedfor_values_test() ->
+    {reply,return_first,
+     [{askedfor,[return_second,return_first]},
+      {unaskedfor,[not_returned_first,not_returned_second]}]
+    } = rr:handle_call(
+	  {next,askedfor},test,
+	  [{askedfor,[return_first,return_second]},
+	   {unaskedfor,[not_returned_first,not_returned_second]}]).
+
+-endif.
