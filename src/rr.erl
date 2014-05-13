@@ -17,7 +17,9 @@
 %% API
 -export([start_link/0]).
 -export([add/2,next/1,rm/2,set/2]).
+-ifdef(EXPOSE_STATE).
 -export([state/0]).
+-endif.
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -36,7 +38,9 @@
 -spec(next(class()) -> undefined | item()).
 -spec(rm(class(),item()) -> undefined | ok).
 -spec(set(class(),[item()]) -> ok).
+-ifdef(EXPOSE_STATE).
 -spec(state() -> [{class(),[item()]}]).
+-endif.
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -60,8 +64,10 @@ rm(Class,Item) ->
 set(Class,Items) ->
     gen_server:call(?SERVER,{set,Class,Items}).
 
+-ifdef(EXPOSE_STATE).
 state() ->
     gen_server:call(?SERVER,state).
+-endif.
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -135,7 +141,14 @@ handle_call({rm,Class,Item},_From,State) ->
 	false ->
 	    {reply, undefined, State};
 	{Class,Items} ->
-	    {reply, ok, lists:keyreplace(Class,1,State,{Class,lists:dropwhile(fun(I) -> I == Item end,Items)})}
+	    case lists:subtract(Items,[Item]) of
+		Items ->
+		    {reply,undefined,State};
+		[] ->
+		    {reply, ok, lists:keydelete(Class,1,State)};
+		NewList ->
+		    {reply, ok, lists:keyreplace(Class,1,State,{Class,NewList})}
+	    end
     end;
 handle_call(state,_From,State) ->
     {reply,State,State};
@@ -227,7 +240,11 @@ next_handles_single_item_in_list_test() ->
     {reply,only,[{class,[only]}]} = rr:handle_call({next,class},test,[{class,[only]}]).
 
 next_returns_undefined_for_missing_class_test() ->
-    {reply,undefined,[{present,[value]}]} = rr:handle_call({next,missing},test,[{present,[value]}]).
+    {reply,
+     undefined,
+     [{present,[value]}]
+    } = rr:handle_call(
+	    {next,missing},test,[{present,[value]}]).
 
 next_preserves_unaskedfor_values_test() ->
     {reply,return_first,
@@ -237,5 +254,46 @@ next_preserves_unaskedfor_values_test() ->
 	  {next,askedfor},test,
 	  [{askedfor,[return_first,return_second]},
 	   {unaskedfor,[not_returned_first,not_returned_second]}]).
+
+add_creates_new_tuple_in_state_test() ->
+    {reply,ok,[{new_class,[new_value]}]}
+	= rr:handle_call({add,new_class,new_value},test,[]).
+
+add_creates_new_list_item_in_state_test() ->
+    {reply,ok,[{existing_class,[existing_value,new_value]}]}
+	= rr:handle_call(
+	    {add,existing_class,new_value},
+	    test,
+	    [{existing_class,[existing_value]}]).
+
+rm_returns_undefined_for_unknown_class_test() ->
+    {reply,undefined,[{known_class,[known_value]}]}
+	= rr:handle_call({rm,unknown_class,known_value},
+			test,
+			[{known_class,[known_value]}]).
+
+rm_returns_undefined_for_unknown_item_test() ->
+    {reply,undefined,[{known_class,[known_value]}]}
+	= rr:handle_call({rm,known_class,unknown_value},
+			test,
+			[{known_class,[known_value]}]).
+
+rm_removes_requested_item_from_state_test() ->
+    {reply,ok,
+     [{class_one,[value_one]},
+      {class_two,[value_one,value_two]}]}
+	= rr:handle_call(
+	    {rm,class_one,value_two},test,
+	    [{class_one,[value_one,value_two]},
+	     {class_two,[value_one,value_two]}]).
+
+rm_removes_class_if_removing_only_item_test() ->	       
+    {reply,ok,
+     [{class_two,[value_one,value_two]}]}
+	= rr:handle_call(
+	    {rm,class_one,only_value},test,
+	    [{class_one,[only_value]},
+	     {class_two,[value_one,value_two]}]).
+    
 
 -endif.
