@@ -143,10 +143,13 @@ handle_call({rm,Class,Item},_From,State) ->
 	{Class,Items} ->
 	    case lists:subtract(Items,[Item]) of
 		Items ->
+		    % subtract yeilds original -> item was not in list
 		    {reply,undefined,State};
 		[] ->
+		    % subtract yeilds empty list -> remove class
 		    {reply, ok, lists:keydelete(Class,1,State)};
 		NewList ->
+		    % subtract yeilds new list -> replace old list with new one
 		    {reply, ok, lists:keyreplace(Class,1,State,{Class,NewList})}
 	    end
     end;
