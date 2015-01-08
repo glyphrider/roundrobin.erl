@@ -1,7 +1,4 @@
-language: erlang // This project is an Erlang project
-notifications:
-  email: you@example.org // Notify this e-mail address on build failures
+language: erlang
 otp_release: // The Erlang/OTP versions to run your test against.
   - 17.4
-  - R16B03-1
-  - R15B03-1
+  - R16B03
