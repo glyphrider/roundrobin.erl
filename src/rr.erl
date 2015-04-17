@@ -86,7 +86,7 @@ state() ->
 %%--------------------------------------------------------------------
 init([]) ->
     lager:info("roundrobin_server starting"),
-    case file:consult(?SEED_FILE) of
+    case file:consult(seed_file()) of
 	{ok, State} ->
 	    process_flag(trap_exit,true),
 	    {ok, State};
@@ -94,6 +94,12 @@ init([]) ->
 	    lager:warning("could not load seed file ~p (reason: ~p)",[?SEED_FILE,Reason]),
 	    {ok,[]}
     end.
+
+seed_file() ->
+	case application:get_env(seed) of
+	{ok,Seed} -> Seed;
+	undefined -> ?SEED_FILE
+	end.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -200,7 +206,7 @@ handle_info(Info, State) ->
 %%--------------------------------------------------------------------
 terminate(Reason,State) ->
     lager:info("rr:terminate(): reason -> ~p",[Reason]),
-    case file:open(?SEED_FILE,write) of
+    case file:open(seed_file(),write) of
 	{error,Reason} ->
 	    lager:error("rr:terminate(): could not persist state data to ~p",[?SEED_FILE]);
 	{ok,File} ->
